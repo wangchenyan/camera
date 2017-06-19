@@ -17,19 +17,20 @@ import android.widget.ImageView;
  * Created by hzwangchenyan on 2017/6/14.
  */
 public class CaptureLayout extends FrameLayout implements View.OnClickListener {
+    private View captureRetryLayout;
     private ImageView btnCapture;
     private ImageView btnRetry;
     private ImageView btnClose;
 
-    private Listener mListener;
+    private ClickListener mClickListener;
     private boolean isExpanded;
 
-    public interface Listener {
+    public interface ClickListener {
         void onCaptureClick();
 
         void onOkClick();
 
-        void onCancelClick();
+        void onRetryClick();
 
         void onCloseClick();
     }
@@ -50,6 +51,7 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
     private void init() {
         setClickable(true);
         LayoutInflater.from(getContext()).inflate(R.layout.camera_capture_layout, this, true);
+        captureRetryLayout = findViewById(R.id.camera_capture_retry_layout);
         btnCapture = (ImageView) findViewById(R.id.camera_capture);
         btnRetry = (ImageView) findViewById(R.id.camera_retry);
         btnClose = (ImageView) findViewById(R.id.camera_close);
@@ -60,8 +62,8 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
         btnClose.setOnClickListener(this);
     }
 
-    public void setListener(Listener listener) {
-        mListener = listener;
+    public void setClickListener(ClickListener listener) {
+        mClickListener = listener;
     }
 
     public void setExpanded(boolean expanded) {
@@ -79,23 +81,20 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
 
     @Override
     public void onClick(View v) {
+        if (mClickListener == null) {
+            return;
+        }
+
         if (v == btnCapture) {
-            if (mListener != null) {
-                if (!isExpanded) {
-                    mListener.onCaptureClick();
-                } else {
-                    mListener.onOkClick();
-                }
+            if (!isExpanded) {
+                mClickListener.onCaptureClick();
+            } else {
+                mClickListener.onOkClick();
             }
         } else if (v == btnRetry) {
-            if (mListener != null) {
-                mListener.onCancelClick();
-            }
+            mClickListener.onRetryClick();
         } else if (v == btnClose) {
-            if (mListener != null) {
-                mListener.onCloseClick();
-            }
-
+            mClickListener.onCloseClick();
         }
     }
 
@@ -110,16 +109,17 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
             LayoutParams captureParams = (LayoutParams) btnCapture.getLayoutParams();
             captureParams.width = CameraUtils.dp2px(getContext(), 80);
             captureParams.height = CameraUtils.dp2px(getContext(), 80);
-            captureParams.leftMargin = CameraUtils.dp2px(getContext(), 200);
             captureParams.gravity = Gravity.END;
-            btnCapture.setLayoutParams(captureParams);
+
+            LayoutParams layoutParams = (LayoutParams) captureRetryLayout.getLayoutParams();
+            layoutParams.width = CameraUtils.dp2px(getContext(), 280);
+            captureRetryLayout.requestLayout();
         }
     }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private void playExpandAnimation() {
-        final int baseLength = CameraUtils.dp2px(getContext(), 60);
-        ValueAnimator scaleAnimator = ValueAnimator.ofInt(0, CameraUtils.dp2px(getContext(), 20));
+        ValueAnimator scaleAnimator = ValueAnimator.ofInt(CameraUtils.dp2px(getContext(), 60), CameraUtils.dp2px(getContext(), 80));
         scaleAnimator.setInterpolator(new LinearInterpolator());
         scaleAnimator.setDuration(100);
         scaleAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
@@ -127,14 +127,14 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
             public void onAnimationUpdate(ValueAnimator animation) {
                 int value = (int) animation.getAnimatedValue();
                 LayoutParams captureParams = (LayoutParams) btnCapture.getLayoutParams();
-                captureParams.width = baseLength + value;
-                captureParams.height = baseLength + value;
+                captureParams.width = value;
+                captureParams.height = value;
                 captureParams.gravity = Gravity.CENTER;
-                btnCapture.setLayoutParams(captureParams);
+                btnCapture.requestLayout();
             }
         });
 
-        ValueAnimator transAnimator = ValueAnimator.ofInt(0, CameraUtils.dp2px(getContext(), 200));
+        ValueAnimator transAnimator = ValueAnimator.ofInt(CameraUtils.dp2px(getContext(), 80), CameraUtils.dp2px(getContext(), 280));
         transAnimator.setInterpolator(new LinearInterpolator());
         transAnimator.setDuration(200);
         transAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
@@ -142,9 +142,11 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
             public void onAnimationUpdate(ValueAnimator animation) {
                 int value = (int) animation.getAnimatedValue();
                 LayoutParams captureParams = (LayoutParams) btnCapture.getLayoutParams();
-                captureParams.leftMargin = value;
                 captureParams.gravity = Gravity.END;
-                btnCapture.setLayoutParams(captureParams);
+
+                LayoutParams layoutParams = (LayoutParams) captureRetryLayout.getLayoutParams();
+                layoutParams.width = value;
+                captureRetryLayout.requestLayout();
             }
         });
 
@@ -162,8 +164,10 @@ public class CaptureLayout extends FrameLayout implements View.OnClickListener {
         LayoutParams captureParams = (LayoutParams) btnCapture.getLayoutParams();
         captureParams.width = length;
         captureParams.height = length;
-        captureParams.leftMargin = 0;
         captureParams.gravity = Gravity.CENTER;
-        btnCapture.setLayoutParams(captureParams);
+
+        LayoutParams layoutParams = (LayoutParams) captureRetryLayout.getLayoutParams();
+        layoutParams.width = CameraUtils.dp2px(getContext(), 80);
+        captureRetryLayout.requestLayout();
     }
 }

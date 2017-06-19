@@ -37,9 +37,10 @@ public class CameraManager {
     private int CAMERA_ID_FRONT = -1;
 
     private Context mContext;
+    private Camera mCamera;
     private Handler mUiHandler;
     private Handler mThreadHandler;
-    private Camera mCamera;
+    private SurfaceHolder mSurfaceHolder;
     private Point mScreenSize;
     private int mCameraId;
     private State mState = State.STATE_IDLE;
@@ -70,12 +71,16 @@ public class CameraManager {
         mCameraId = -1;
     }
 
-    public void open(final SurfaceHolder holder, final Callback<Boolean> callback) {
+    public void setSurfaceHolder(SurfaceHolder surfaceHolder) {
+        mSurfaceHolder = surfaceHolder;
+    }
+
+    public void open(final Callback<Boolean> callback) {
         checkInitialize();
         mThreadHandler.post(new SafeRunnable() {
             @Override
             public void runSafely() {
-                openImmediate(holder);
+                openImmediate();
 
                 final boolean success = (mState == State.STATE_OPENED);
                 mUiHandler.post(new Runnable() {
@@ -88,10 +93,10 @@ public class CameraManager {
         });
     }
 
-    private void openImmediate(SurfaceHolder holder) {
+    private void openImmediate() {
         closeImmediate();
 
-        if (holder == null || holder.getSurface() == null || !holder.getSurface().isValid()) {
+        if (mSurfaceHolder == null) {
             return;
         }
 
@@ -111,7 +116,7 @@ public class CameraManager {
 
             mCamera.setParameters(parameters);
             mCamera.setDisplayOrientation(getDisplayOrientation());
-            mCamera.setPreviewDisplay(holder);
+            mCamera.setPreviewDisplay(mSurfaceHolder);
             mCamera.startPreview();
             setState(State.STATE_OPENED);
         } catch (Throwable th) {
@@ -180,7 +185,7 @@ public class CameraManager {
         });
     }
 
-    public void switchCamera(final SurfaceHolder holder, final Callback<Boolean> callback) {
+    public void switchCamera(final Callback<Boolean> callback) {
         checkInitialize();
         mThreadHandler.post(new SafeRunnable() {
             @Override
@@ -197,7 +202,7 @@ public class CameraManager {
                     mCameraId = CAMERA_ID_BACK;
                 }
 
-                openImmediate(holder);
+                openImmediate();
 
                 final boolean success = (mState == State.STATE_OPENED);
                 mUiHandler.post(new Runnable() {

@@ -14,6 +14,7 @@
         android:src="@drawable/ic_camera_close" />
 
     <FrameLayout
+        android:id="@+id/camera_capture_retry_layout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center">

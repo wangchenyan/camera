@@ -28,7 +28,7 @@ import android.widget.ImageView;
  * Created by hzwangchenyan on 2017/6/13.
  */
 public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
-        CaptureLayout.Listener, View.OnClickListener, SensorEventListener {
+        CaptureLayout.ClickListener, View.OnClickListener, SensorEventListener {
     private static final String TAG = "CameraView";
     private SurfaceView mSurfaceView;
     private View mFocusView;
@@ -39,11 +39,12 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
     private GestureDetector mGestureDetector;
     private ScaleGestureDetector mScaleGestureDetector;
     private SensorManager mSensorManager;
-    private Listener mListener;
+    private CameraListener mCameraListener;
     private Bitmap mPicture;
     private int mSensorRotation;
+    private boolean isSurfaceCreated;
 
-    public interface Listener {
+    public interface CameraListener {
         void onCapture(Bitmap bitmap);
 
         void onCameraClose();
@@ -78,11 +79,12 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
         CameraManager.getInstance().init(getContext());
 
         mSurfaceView.setOnTouchListener(surfaceTouchListener);
+        // fix `java.lang.RuntimeException: startPreview failed` on api 10
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.GINGERBREAD_MR1) {
             mSurfaceView.getHolder().setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         }
         mSurfaceView.getHolder().addCallback(this);
-        mCaptureLayout.setListener(this);
+        mCaptureLayout.setClickListener(this);
         mSwitchWrapper.setVisibility(CameraManager.getInstance().hasMultiCamera() ? VISIBLE : GONE);
         mSwitchWrapper.setOnClickListener(this);
 
@@ -91,21 +93,19 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
         mSensorManager = (SensorManager) getContext().getSystemService(Context.SENSOR_SERVICE);
     }
 
-    public void setListener(Listener listener) {
-        mListener = listener;
+    public void setCameraListener(CameraListener listener) {
+        mCameraListener = listener;
     }
 
     public void onResume() {
         Log.d(TAG, "onResume");
 
-        if (!CameraManager.getInstance().isOpened()
-                && mSurfaceView.getVisibility() == VISIBLE
-                && mSurfaceView.getHolder().getSurface().isValid()) {
-            CameraManager.getInstance().open(mSurfaceView.getHolder(), new CameraManager.Callback<Boolean>() {
+        if (!CameraManager.getInstance().isOpened() && isSurfaceCreated) {
+            CameraManager.getInstance().open(new CameraManager.Callback<Boolean>() {
                 @Override
                 public void onEvent(Boolean success) {
-                    if (!success && mListener != null) {
-                        mListener.onCameraError(new Exception("open camera failed"));
+                    if (!success && mCameraListener != null) {
+                        mCameraListener.onCameraError(new Exception("open camera failed"));
                     }
                 }
             });
@@ -127,27 +127,30 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mListener = null;
+        Log.d(TAG, "onDetachedFromWindow");
+        mCameraListener = null;
     }
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         Log.d(TAG, "surfaceCreated");
+        isSurfaceCreated = true;
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
         Log.d(TAG, "surfaceChanged");
+        CameraManager.getInstance().setSurfaceHolder(holder);
 
         if (CameraManager.getInstance().isOpened()) {
             CameraManager.getInstance().close();
         }
 
-        CameraManager.getInstance().open(holder, new CameraManager.Callback<Boolean>() {
+        CameraManager.getInstance().open(new CameraManager.Callback<Boolean>() {
             @Override
             public void onEvent(Boolean success) {
-                if (!success && mListener != null) {
-                    mListener.onCameraError(new Exception("open camera failed"));
+                if (!success && mCameraListener != null) {
+                    mCameraListener.onCameraError(new Exception("open camera failed"));
                 }
             }
         });
@@ -156,6 +159,8 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
     @Override
     public void surfaceDestroyed(final SurfaceHolder holder) {
         Log.d(TAG, "surfaceDestroyed");
+        isSurfaceCreated = false;
+        CameraManager.getInstance().setSurfaceHolder(null);
     }
 
     @Override
@@ -168,11 +173,11 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
                     mSwitchWrapper.setVisibility(GONE);
                     mPictureView.setVisibility(VISIBLE);
                     mPicture = bitmap;
-                    mPictureView.setImageBitmap(bitmap);
+                    mPictureView.setImageBitmap(mPicture);
                     mCaptureLayout.setExpanded(true);
                 } else {
                     // 不知道什么原因拍照失败，重新预览
-                    onCancelClick();
+                    onRetryClick();
                 }
             }
         });
@@ -180,43 +185,36 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
 
     @Override
     public void onOkClick() {
-        if (mPicture != null && mListener != null) {
-            mListener.onCapture(mPicture);
+        if (mPicture != null && mCameraListener != null) {
+            mCameraListener.onCapture(mPicture);
         }
     }
 
     @Override
-    public void onCancelClick() {
+    public void onRetryClick() {
         mPicture = null;
         mCaptureLayout.setExpanded(false);
         mSurfaceView.setVisibility(VISIBLE);
         mSwitchWrapper.setVisibility(CameraManager.getInstance().hasMultiCamera() ? VISIBLE : GONE);
+        mPictureView.setImageBitmap(null);
         mPictureView.setVisibility(GONE);
-        CameraManager.getInstance().open(mSurfaceView.getHolder(), new CameraManager.Callback<Boolean>() {
-            @Override
-            public void onEvent(Boolean success) {
-                if (!success && mListener != null) {
-                    mListener.onCameraError(new Exception("open camera failed"));
-                }
-            }
-        });
     }
 
     @Override
     public void onCloseClick() {
-        if (mListener != null) {
-            mListener.onCameraClose();
+        if (mCameraListener != null) {
+            mCameraListener.onCameraClose();
         }
     }
 
     @Override
     public void onClick(View v) {
         if (v == mSwitchWrapper) {
-            CameraManager.getInstance().switchCamera(mSurfaceView.getHolder(), new CameraManager.Callback<Boolean>() {
+            CameraManager.getInstance().switchCamera(new CameraManager.Callback<Boolean>() {
                 @Override
                 public void onEvent(Boolean success) {
-                    if (!success && mListener != null) {
-                        mListener.onCameraError(new Exception("switch camera failed"));
+                    if (!success && mCameraListener != null) {
+                        mCameraListener.onCameraError(new Exception("switch camera failed"));
                     }
                 }
             });
@@ -293,11 +291,11 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
         @Override
         public boolean onDoubleTap(MotionEvent e) {
             Log.d(TAG, "onDoubleTap");
-            CameraManager.getInstance().switchCamera(mSurfaceView.getHolder(), new CameraManager.Callback<Boolean>() {
+            CameraManager.getInstance().switchCamera(new CameraManager.Callback<Boolean>() {
                 @Override
                 public void onEvent(Boolean success) {
-                    if (!success && mListener != null) {
-                        mListener.onCameraError(new Exception("switch camera failed"));
+                    if (!success && mCameraListener != null) {
+                        mCameraListener.onCameraError(new Exception("switch camera failed"));
                     }
                 }
             });

@@ -20,7 +20,7 @@ import me.wcy.camera.CameraView;
 /**
  * Created by hzwangchenyan on 2017/6/15.
  */
-public class CameraActivity extends Activity implements CameraView.Listener {
+public class CameraActivity extends Activity implements CameraView.CameraListener {
     private static final String TAG = "CameraActivity";
     private CameraView mCameraView;
     private String mPath;
@@ -47,7 +47,7 @@ public class CameraActivity extends Activity implements CameraView.Listener {
             return;
         }
 
-        mCameraView.setListener(this);
+        mCameraView.setCameraListener(this);
     }
 
     @Override
