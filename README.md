@@ -2,6 +2,8 @@
 
 Android 仿微信拍照控件
 
+![](https://raw.githubusercontent.com/wangchenyan/Camera/master/art/screenshot.jpg)
+
 使用 `Camera1 API` 和 `SurfaceView` 实现，最低支持 `API 9`。
 
 对相机的操作全部在工作线程中，防止阻塞UI。
