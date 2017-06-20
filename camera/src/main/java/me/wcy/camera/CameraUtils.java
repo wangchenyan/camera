@@ -18,20 +18,20 @@ import java.util.List;
 public class CameraUtils {
     private static final String TAG = "CameraUtils";
 
-    public static void setPreviewParams(Point screenSize, Camera.Parameters parameters) {
-        if (screenSize == null || parameters == null) {
+    public static void setPreviewParams(Point surfaceSize, Camera.Parameters parameters) {
+        if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || parameters == null) {
             return;
         }
 
         List<Camera.Size> previewSizeList = parameters.getSupportedPreviewSizes();
-        Camera.Size previewSize = findProperSize(screenSize, previewSizeList);
+        Camera.Size previewSize = findProperSize(surfaceSize, previewSizeList);
         if (previewSize != null) {
             parameters.setPreviewSize(previewSize.width, previewSize.height);
             Log.d(TAG, "previewSize: width: " + previewSize.width + ", height: " + previewSize.height);
         }
 
         List<Camera.Size> pictureSizeList = parameters.getSupportedPictureSizes();
-        Camera.Size pictureSize = findProperSize(screenSize, pictureSizeList);
+        Camera.Size pictureSize = findProperSize(surfaceSize, pictureSizeList);
         if (pictureSize != null) {
             parameters.setPictureSize(pictureSize.width, pictureSize.height);
             Log.d(TAG, "pictureSize: width: " + pictureSize.width + ", height: " + pictureSize.height);
@@ -55,25 +55,25 @@ public class CameraUtils {
      * 2.在比例最接近的尺寸组中找出最接近屏幕尺寸且大于屏幕尺寸的尺寸
      * 3.如果没有找到，则忽略2中第二个条件再找一遍，应该是最合适的尺寸了
      */
-    private static Camera.Size findProperSize(Point screenSize, List<Camera.Size> sizeList) {
-        if (screenSize == null || sizeList == null) {
+    private static Camera.Size findProperSize(Point surfaceSize, List<Camera.Size> sizeList) {
+        if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || sizeList == null) {
             return null;
         }
 
-        int screenWidth = screenSize.x;
-        int screenHeight = screenSize.y;
+        int surfaceWidth = surfaceSize.x;
+        int surfaceHeight = surfaceSize.y;
 
         List<List<Camera.Size>> ratioListList = new ArrayList<>();
         for (Camera.Size size : sizeList) {
             addRatioList(ratioListList, size);
         }
 
-        final float screenRatio = (float) screenWidth / screenHeight;
+        final float surfaceRatio = (float) surfaceWidth / surfaceHeight;
         List<Camera.Size> bestRatioList = null;
         float ratioDiff = Float.MAX_VALUE;
         for (List<Camera.Size> ratioList : ratioListList) {
             float ratio = (float) ratioList.get(0).width / ratioList.get(0).height;
-            float newRatioDiff = Math.abs(ratio - screenRatio);
+            float newRatioDiff = Math.abs(ratio - surfaceRatio);
             if (newRatioDiff < ratioDiff) {
                 bestRatioList = ratioList;
                 ratioDiff = newRatioDiff;
@@ -84,8 +84,8 @@ public class CameraUtils {
         int diff = Integer.MAX_VALUE;
         assert bestRatioList != null;
         for (Camera.Size size : bestRatioList) {
-            int newDiff = Math.abs(size.width - screenWidth) + Math.abs(size.height - screenHeight);
-            if (size.height >= screenHeight && newDiff < diff) {
+            int newDiff = Math.abs(size.width - surfaceWidth) + Math.abs(size.height - surfaceHeight);
+            if (size.height >= surfaceHeight && newDiff < diff) {
                 bestSize = size;
                 diff = newDiff;
             }
@@ -97,7 +97,7 @@ public class CameraUtils {
 
         diff = Integer.MAX_VALUE;
         for (Camera.Size size : bestRatioList) {
-            int newDiff = Math.abs(size.width - screenWidth) + Math.abs(size.height - screenHeight);
+            int newDiff = Math.abs(size.width - surfaceWidth) + Math.abs(size.height - surfaceHeight);
             if (newDiff < diff) {
                 bestSize = size;
                 diff = newDiff;
@@ -123,13 +123,13 @@ public class CameraUtils {
     }
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    public static void setFocusArea(Point screenSize, Camera.Parameters parameters, float x, float y) {
-        if (screenSize == null || parameters == null) {
+    public static void setFocusArea(Point surfaceSize, Camera.Parameters parameters, float x, float y) {
+        if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || parameters == null) {
             return;
         }
 
         if (parameters.getMaxNumFocusAreas() > 0) {
-            Rect focusRect = calculateTapArea(screenSize, x, y, 1f);
+            Rect focusRect = calculateTapArea(surfaceSize, x, y, 1f);
             Log.d(TAG, "focusRect: " + focusRect);
             List<Camera.Area> focusAreas = new ArrayList<>(1);
             focusAreas.add(new Camera.Area(focusRect, 800));
@@ -137,7 +137,7 @@ public class CameraUtils {
         }
 
         if (parameters.getMaxNumMeteringAreas() > 0) {
-            Rect meteringRect = calculateTapArea(screenSize, x, y, 1.5f);
+            Rect meteringRect = calculateTapArea(surfaceSize, x, y, 1.5f);
             Log.d(TAG, "meteringRect: " + meteringRect);
             List<Camera.Area> meteringAreas = new ArrayList<>(1);
             meteringAreas.add(new Camera.Area(meteringRect, 800));
@@ -151,13 +151,13 @@ public class CameraUtils {
      * 转换对焦区域
      * 范围(-1000, -1000, 1000, 1000)
      */
-    private static Rect calculateTapArea(Point screenSize, float x, float y, float coefficient) {
+    private static Rect calculateTapArea(Point surfaceSize, float x, float y, float coefficient) {
         float focusAreaSize = 200;
         int areaSize = (int) (focusAreaSize * coefficient);
-        int screenWidth = screenSize.x;
-        int screenHeight = screenSize.y;
-        int centerX = (int) (x / screenHeight * 2000 - 1000);
-        int centerY = (int) (y / screenWidth * 2000 - 1000);
+        int surfaceWidth = surfaceSize.x;
+        int surfaceHeight = surfaceSize.y;
+        int centerX = (int) (x / surfaceHeight * 2000 - 1000);
+        int centerY = (int) (y / surfaceWidth * 2000 - 1000);
         int left = clamp(centerX - (areaSize / 2), -1000, 1000);
         int top = clamp(centerY - (areaSize / 2), -1000, 1000);
         int right = clamp(left + areaSize, -1000, 1000);
@@ -166,30 +166,23 @@ public class CameraUtils {
     }
 
     private static int clamp(int x, int min, int max) {
-        if (x > max) {
-            return max;
-        }
-        if (x < min) {
-            return min;
-        }
-        return x;
+        return Math.min(Math.max(x, min), max);
     }
 
     /**
      * 根据屏幕宽度和最大缩放倍数计算缩放单位
      */
-    public static boolean setZoom(Point screenSize, Camera.Parameters parameters, float span) {
-        if (screenSize == null || parameters == null) {
+    public static boolean setZoom(Point surfaceSize, Camera.Parameters parameters, float span) {
+        if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || parameters == null) {
             return false;
         }
 
-        int screenMin = screenSize.y;
         int maxZoom = parameters.getMaxZoom();
-        int unit = screenMin / 5 / maxZoom;
+        int unit = surfaceSize.y / 5 / maxZoom;
         int zoom = (int) (span / unit);
         int lastZoom = parameters.getZoom();
         int currZoom = lastZoom + zoom;
-        currZoom = Math.min(Math.max(0, currZoom), maxZoom);
+        currZoom = clamp(currZoom, 0, maxZoom);
         parameters.setZoom(currZoom);
         return lastZoom != currZoom;
     }

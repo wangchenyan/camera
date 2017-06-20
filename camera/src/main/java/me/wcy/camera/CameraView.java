@@ -140,7 +140,7 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
         Log.d(TAG, "surfaceChanged");
-        CameraManager.getInstance().setSurfaceHolder(holder);
+        CameraManager.getInstance().setSurfaceHolder(holder, width, height);
 
         if (CameraManager.getInstance().isOpened()) {
             CameraManager.getInstance().close();
@@ -160,7 +160,7 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
     public void surfaceDestroyed(final SurfaceHolder holder) {
         Log.d(TAG, "surfaceDestroyed");
         isSurfaceCreated = false;
-        CameraManager.getInstance().setSurfaceHolder(null);
+        CameraManager.getInstance().setSurfaceHolder(null, 0, 0);
     }
 
     @Override
@@ -308,7 +308,6 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
 
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
-            Log.d(TAG, "onScale");
             float span = detector.getCurrentSpan() - mLastSpan;
             mLastSpan = detector.getCurrentSpan();
             if (CameraManager.getInstance().isOpened()) {
@@ -320,12 +319,14 @@ public class CameraView extends FrameLayout implements SurfaceHolder.Callback,
 
         @Override
         public boolean onScaleBegin(ScaleGestureDetector detector) {
+            Log.d(TAG, "onScaleBegin");
             mLastSpan = detector.getCurrentSpan();
             return CameraManager.getInstance().isOpened();
         }
 
         @Override
         public void onScaleEnd(ScaleGestureDetector detector) {
+            Log.d(TAG, "onScaleEnd");
         }
     };
 

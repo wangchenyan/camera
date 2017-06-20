@@ -11,7 +11,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -41,7 +40,7 @@ public class CameraManager {
     private Handler mUiHandler;
     private Handler mThreadHandler;
     private SurfaceHolder mSurfaceHolder;
-    private Point mScreenSize;
+    private Point mSurfaceSize = new Point();
     private int mCameraId;
     private State mState = State.STATE_IDLE;
     private int mSensorRotation;
@@ -64,15 +63,12 @@ public class CameraManager {
 
     public void init(Context context) {
         mContext = context.getApplicationContext();
-        DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
-        int width = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
-        int height = Math.min(displayMetrics.widthPixels, displayMetrics.heightPixels);
-        mScreenSize = new Point(width, height);
         mCameraId = -1;
     }
 
-    public void setSurfaceHolder(SurfaceHolder surfaceHolder) {
-        mSurfaceHolder = surfaceHolder;
+    public void setSurfaceHolder(SurfaceHolder holder, int width, int height) {
+        mSurfaceHolder = holder;
+        mSurfaceSize.set(height, width);
     }
 
     public void open(final Callback<Boolean> callback) {
@@ -112,7 +108,7 @@ public class CameraManager {
             mCamera = Camera.open(mCameraId);
 
             Camera.Parameters parameters = mCamera.getParameters();
-            CameraUtils.setPreviewParams(mScreenSize, parameters);
+            CameraUtils.setPreviewParams(mSurfaceSize, parameters);
 
             mCamera.setParameters(parameters);
             mCamera.setDisplayOrientation(getDisplayOrientation());
@@ -144,7 +140,7 @@ public class CameraManager {
 
                 mCamera.cancelAutoFocus();
                 Camera.Parameters parameters = mCamera.getParameters();
-                CameraUtils.setFocusArea(mScreenSize, parameters, x, y);
+                CameraUtils.setFocusArea(mSurfaceSize, parameters, x, y);
                 mCamera.setParameters(parameters);
                 mCamera.autoFocus(new Camera.AutoFocusCallback() {
                     @Override
@@ -176,7 +172,7 @@ public class CameraManager {
 
                 Camera.Parameters parameters = mCamera.getParameters();
                 if (parameters.isZoomSupported()) {
-                    boolean valid = CameraUtils.setZoom(mScreenSize, parameters, span);
+                    boolean valid = CameraUtils.setZoom(mSurfaceSize, parameters, span);
                     if (valid) {
                         mCamera.setParameters(parameters);
                     }
