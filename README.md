@@ -1,8 +1,8 @@
-# Camera
+# camera
 
 Android 仿微信拍照控件
 
-![](https://raw.githubusercontent.com/wangchenyan/Camera/master/art/screenshot.jpg)
+![](https://raw.githubusercontent.com/wangchenyan/camera/master/art/screenshot.jpg)
 
 使用 `Camera1 API` 和 `SurfaceView` 实现，最低支持 `API 9`。
 
