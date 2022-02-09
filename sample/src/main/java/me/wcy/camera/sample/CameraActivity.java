@@ -1,11 +1,11 @@
 package me.wcy.camera.sample;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import androidx.appcompat.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Window;
@@ -20,12 +20,12 @@ import me.wcy.camera.CameraView;
 /**
  * Created by hzwangchenyan on 2017/6/15.
  */
-public class CameraActivity extends Activity implements CameraView.CameraListener {
+public class CameraActivity extends AppCompatActivity implements CameraView.CameraListener {
     private static final String TAG = "CameraActivity";
     private CameraView mCameraView;
     private String mPath;
 
-    public static void startForResult(Activity activity, String path, int requestCode) {
+    public static void startForResult(AppCompatActivity activity, String path, int requestCode) {
         Intent intent = new Intent(activity, CameraActivity.class);
         intent.putExtra(MediaStore.EXTRA_OUTPUT, path);
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
