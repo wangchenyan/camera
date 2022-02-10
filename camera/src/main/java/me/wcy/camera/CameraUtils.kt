@@ -1,51 +1,50 @@
-package me.wcy.camera;
+package me.wcy.camera
 
-import android.annotation.TargetApi;
-import android.content.Context;
-import android.graphics.ImageFormat;
-import android.graphics.Point;
-import android.graphics.Rect;
-import android.hardware.Camera;
-import android.os.Build;
-import android.util.Log;
-
-import java.util.ArrayList;
-import java.util.List;
+import android.annotation.TargetApi
+import android.content.Context
+import android.graphics.ImageFormat
+import android.graphics.Point
+import android.graphics.Rect
+import android.hardware.Camera
+import android.os.Build
+import android.util.Log
 
 /**
  * Created by hzwangchenyan on 2017/6/13.
  */
-public class CameraUtils {
-    private static final String TAG = "CameraUtils";
+object CameraUtils {
+    private const val TAG = "CameraUtils"
 
-    public static void setPreviewParams(Point surfaceSize, Camera.Parameters parameters) {
+    fun setPreviewParams(surfaceSize: Point, parameters: Camera.Parameters?) {
         if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || parameters == null) {
-            return;
+            return
         }
-
-        List<Camera.Size> previewSizeList = parameters.getSupportedPreviewSizes();
-        Camera.Size previewSize = findProperSize(surfaceSize, previewSizeList);
+        val previewSizeList = parameters.supportedPreviewSizes
+        val previewSize = findProperSize(surfaceSize, previewSizeList)
         if (previewSize != null) {
-            parameters.setPreviewSize(previewSize.width, previewSize.height);
-            Log.d(TAG, "previewSize: width: " + previewSize.width + ", height: " + previewSize.height);
+            parameters.setPreviewSize(previewSize.width, previewSize.height)
+            Log.d(
+                TAG,
+                "previewSize: width: " + previewSize.width + ", height: " + previewSize.height
+            )
         }
-
-        List<Camera.Size> pictureSizeList = parameters.getSupportedPictureSizes();
-        Camera.Size pictureSize = findProperSize(surfaceSize, pictureSizeList);
+        val pictureSizeList = parameters.supportedPictureSizes
+        val pictureSize = findProperSize(surfaceSize, pictureSizeList)
         if (pictureSize != null) {
-            parameters.setPictureSize(pictureSize.width, pictureSize.height);
-            Log.d(TAG, "pictureSize: width: " + pictureSize.width + ", height: " + pictureSize.height);
+            parameters.setPictureSize(pictureSize.width, pictureSize.height)
+            Log.d(
+                TAG,
+                "pictureSize: width: " + pictureSize.width + ", height: " + pictureSize.height
+            )
         }
-
-        List<String> focusModeList = parameters.getSupportedFocusModes();
+        val focusModeList = parameters.supportedFocusModes
         if (focusModeList != null && focusModeList.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
-            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            parameters.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
         }
-
-        List<Integer> pictureFormatList = parameters.getSupportedPictureFormats();
+        val pictureFormatList = parameters.supportedPictureFormats
         if (pictureFormatList != null && pictureFormatList.contains(ImageFormat.JPEG)) {
-            parameters.setPictureFormat(ImageFormat.JPEG);
-            parameters.setJpegQuality(100);
+            parameters.pictureFormat = ImageFormat.JPEG
+            parameters.jpegQuality = 100
         }
     }
 
@@ -55,136 +54,129 @@ public class CameraUtils {
      * 2.在比例最接近的尺寸组中找出最接近屏幕尺寸且大于屏幕尺寸的尺寸
      * 3.如果没有找到，则忽略2中第二个条件再找一遍，应该是最合适的尺寸了
      */
-    private static Camera.Size findProperSize(Point surfaceSize, List<Camera.Size> sizeList) {
+    private fun findProperSize(surfaceSize: Point, sizeList: List<Camera.Size>?): Camera.Size? {
         if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || sizeList == null) {
-            return null;
+            return null
         }
-
-        int surfaceWidth = surfaceSize.x;
-        int surfaceHeight = surfaceSize.y;
-
-        List<List<Camera.Size>> ratioListList = new ArrayList<>();
-        for (Camera.Size size : sizeList) {
-            addRatioList(ratioListList, size);
+        val surfaceWidth = surfaceSize.x
+        val surfaceHeight = surfaceSize.y
+        val ratioListList: MutableList<MutableList<Camera.Size>> = ArrayList()
+        for (size in sizeList) {
+            addRatioList(ratioListList, size)
         }
-
-        final float surfaceRatio = (float) surfaceWidth / surfaceHeight;
-        List<Camera.Size> bestRatioList = null;
-        float ratioDiff = Float.MAX_VALUE;
-        for (List<Camera.Size> ratioList : ratioListList) {
-            float ratio = (float) ratioList.get(0).width / ratioList.get(0).height;
-            float newRatioDiff = Math.abs(ratio - surfaceRatio);
+        val surfaceRatio = surfaceWidth.toFloat() / surfaceHeight
+        var bestRatioList: List<Camera.Size>? = null
+        var ratioDiff = Float.MAX_VALUE
+        for (ratioList in ratioListList) {
+            val ratio = ratioList[0].width.toFloat() / ratioList[0].height
+            val newRatioDiff = Math.abs(ratio - surfaceRatio)
             if (newRatioDiff < ratioDiff) {
-                bestRatioList = ratioList;
-                ratioDiff = newRatioDiff;
+                bestRatioList = ratioList
+                ratioDiff = newRatioDiff
             }
         }
-
-        Camera.Size bestSize = null;
-        int diff = Integer.MAX_VALUE;
-        assert bestRatioList != null;
-        for (Camera.Size size : bestRatioList) {
-            int newDiff = Math.abs(size.width - surfaceWidth) + Math.abs(size.height - surfaceHeight);
+        var bestSize: Camera.Size? = null
+        var diff = Int.MAX_VALUE
+        assert(bestRatioList != null)
+        for (size in bestRatioList!!) {
+            val newDiff =
+                Math.abs(size.width - surfaceWidth) + Math.abs(size.height - surfaceHeight)
             if (size.height >= surfaceHeight && newDiff < diff) {
-                bestSize = size;
-                diff = newDiff;
+                bestSize = size
+                diff = newDiff
             }
         }
-
         if (bestSize != null) {
-            return bestSize;
+            return bestSize
         }
-
-        diff = Integer.MAX_VALUE;
-        for (Camera.Size size : bestRatioList) {
-            int newDiff = Math.abs(size.width - surfaceWidth) + Math.abs(size.height - surfaceHeight);
+        diff = Int.MAX_VALUE
+        for (size in bestRatioList) {
+            val newDiff =
+                Math.abs(size.width - surfaceWidth) + Math.abs(size.height - surfaceHeight)
             if (newDiff < diff) {
-                bestSize = size;
-                diff = newDiff;
+                bestSize = size
+                diff = newDiff
             }
         }
-
-        return bestSize;
+        return bestSize
     }
 
-    private static void addRatioList(List<List<Camera.Size>> ratioListList, Camera.Size size) {
-        float ratio = (float) size.width / size.height;
-        for (List<Camera.Size> ratioList : ratioListList) {
-            float mine = (float) ratioList.get(0).width / ratioList.get(0).height;
+    private fun addRatioList(
+        ratioListList: MutableList<MutableList<Camera.Size>>,
+        size: Camera.Size
+    ) {
+        val ratio = size.width.toFloat() / size.height
+        for (ratioList in ratioListList) {
+            val mine = ratioList[0].width.toFloat() / ratioList[0].height
             if (ratio == mine) {
-                ratioList.add(size);
-                return;
+                ratioList.add(size)
+                return
             }
         }
-
-        List<Camera.Size> ratioList = new ArrayList<>();
-        ratioList.add(size);
-        ratioListList.add(ratioList);
+        val ratioList: MutableList<Camera.Size> = ArrayList()
+        ratioList.add(size)
+        ratioListList.add(ratioList)
     }
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    public static void setFocusArea(Point surfaceSize, Camera.Parameters parameters, float x, float y) {
+    fun setFocusArea(surfaceSize: Point, parameters: Camera.Parameters?, x: Float, y: Float) {
         if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || parameters == null) {
-            return;
+            return
         }
-
-        if (parameters.getMaxNumFocusAreas() > 0) {
-            Rect focusRect = calculateTapArea(surfaceSize, x, y, 1f);
-            Log.d(TAG, "focusRect: " + focusRect);
-            List<Camera.Area> focusAreas = new ArrayList<>(1);
-            focusAreas.add(new Camera.Area(focusRect, 800));
-            parameters.setFocusAreas(focusAreas);
+        if (parameters.maxNumFocusAreas > 0) {
+            val focusRect = calculateTapArea(surfaceSize, x, y, 1f)
+            Log.d(TAG, "focusRect: $focusRect")
+            val focusAreas: MutableList<Camera.Area> = ArrayList(1)
+            focusAreas.add(Camera.Area(focusRect, 800))
+            parameters.focusAreas = focusAreas
         }
-
-        if (parameters.getMaxNumMeteringAreas() > 0) {
-            Rect meteringRect = calculateTapArea(surfaceSize, x, y, 1.5f);
-            Log.d(TAG, "meteringRect: " + meteringRect);
-            List<Camera.Area> meteringAreas = new ArrayList<>(1);
-            meteringAreas.add(new Camera.Area(meteringRect, 800));
-            parameters.setMeteringAreas(meteringAreas);
+        if (parameters.maxNumMeteringAreas > 0) {
+            val meteringRect = calculateTapArea(surfaceSize, x, y, 1.5f)
+            Log.d(TAG, "meteringRect: $meteringRect")
+            val meteringAreas: MutableList<Camera.Area> = ArrayList(1)
+            meteringAreas.add(Camera.Area(meteringRect, 800))
+            parameters.meteringAreas = meteringAreas
         }
-
-        parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+        parameters.focusMode = Camera.Parameters.FOCUS_MODE_AUTO
     }
 
     /**
      * 转换对焦区域
      * 范围(-1000, -1000, 1000, 1000)
      */
-    private static Rect calculateTapArea(Point surfaceSize, float x, float y, float coefficient) {
-        float focusAreaSize = 200;
-        int areaSize = (int) (focusAreaSize * coefficient);
-        int surfaceWidth = surfaceSize.x;
-        int surfaceHeight = surfaceSize.y;
-        int centerX = (int) (x / surfaceHeight * 2000 - 1000);
-        int centerY = (int) (y / surfaceWidth * 2000 - 1000);
-        int left = clamp(centerX - (areaSize / 2), -1000, 1000);
-        int top = clamp(centerY - (areaSize / 2), -1000, 1000);
-        int right = clamp(left + areaSize, -1000, 1000);
-        int bottom = clamp(top + areaSize, -1000, 1000);
-        return new Rect(left, top, right, bottom);
+    private fun calculateTapArea(surfaceSize: Point, x: Float, y: Float, coefficient: Float): Rect {
+        val focusAreaSize = 200f
+        val areaSize = (focusAreaSize * coefficient).toInt()
+        val surfaceWidth = surfaceSize.x
+        val surfaceHeight = surfaceSize.y
+        val centerX = (x / surfaceHeight * 2000 - 1000).toInt()
+        val centerY = (y / surfaceWidth * 2000 - 1000).toInt()
+        val left = clamp(centerX - areaSize / 2, -1000, 1000)
+        val top = clamp(centerY - areaSize / 2, -1000, 1000)
+        val right = clamp(left + areaSize, -1000, 1000)
+        val bottom = clamp(top + areaSize, -1000, 1000)
+        return Rect(left, top, right, bottom)
     }
 
-    private static int clamp(int x, int min, int max) {
-        return Math.min(Math.max(x, min), max);
+    private fun clamp(x: Int, min: Int, max: Int): Int {
+        return Math.min(Math.max(x, min), max)
     }
 
     /**
      * 根据屏幕宽度和最大缩放倍数计算缩放单位
      */
-    public static boolean setZoom(Point surfaceSize, Camera.Parameters parameters, float span) {
+    fun setZoom(surfaceSize: Point, parameters: Camera.Parameters?, span: Float): Boolean {
         if (surfaceSize.x <= 0 || surfaceSize.y <= 0 || parameters == null) {
-            return false;
+            return false
         }
-
-        int maxZoom = parameters.getMaxZoom();
-        int unit = surfaceSize.y / 5 / maxZoom;
-        int zoom = (int) (span / unit);
-        int lastZoom = parameters.getZoom();
-        int currZoom = lastZoom + zoom;
-        currZoom = clamp(currZoom, 0, maxZoom);
-        parameters.setZoom(currZoom);
-        return lastZoom != currZoom;
+        val maxZoom = parameters.maxZoom
+        val unit = surfaceSize.y / 5 / maxZoom
+        val zoom = (span / unit).toInt()
+        val lastZoom = parameters.zoom
+        var currZoom = lastZoom + zoom
+        currZoom = clamp(currZoom, 0, maxZoom)
+        parameters.zoom = currZoom
+        return lastZoom != currZoom
     }
 
     /**
@@ -192,26 +184,25 @@ public class CameraUtils {
      *
      * @return -1，表示旋转角度不够大
      */
-    public static int calculateSensorRotation(float x, float y) {
+    fun calculateSensorRotation(x: Float, y: Float): Int {
         if (Math.abs(x) > 6 && Math.abs(y) < 4) {
-            if (x > 6) {
-                return 270;
+            return if (x > 6) {
+                270
             } else {
-                return 90;
+                90
             }
         } else if (Math.abs(y) > 6 && Math.abs(x) < 4) {
-            if (y > 6) {
-                return 0;
+            return if (y > 6) {
+                0
             } else {
-                return 180;
+                180
             }
         }
-
-        return -1;
+        return -1
     }
 
-    public static int dp2px(Context context, float dpValue) {
-        float density = context.getResources().getDisplayMetrics().density;
-        return (int) (dpValue * density + 0.5f);
+    fun dp2px(context: Context, dpValue: Float): Int {
+        val density = context.resources.displayMetrics.density
+        return (dpValue * density + 0.5f).toInt()
     }
 }

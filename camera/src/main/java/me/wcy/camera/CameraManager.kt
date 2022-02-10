@@ -1,354 +1,275 @@
-package me.wcy.camera;
+package me.wcy.camera
 
-import android.annotation.TargetApi;
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.graphics.Point;
-import android.hardware.Camera;
-import android.os.Build;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
-import android.util.Log;
-import android.view.Surface;
-import android.view.SurfaceHolder;
-import android.view.WindowManager;
+import android.annotation.SuppressLint
+import android.annotation.TargetApi
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.graphics.Point
+import android.hardware.Camera
+import android.hardware.Camera.CameraInfo
+import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
+import android.util.Log
+import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.WindowManager
 
 /**
  * Created by hzwangchenyan on 2017/6/13.
  */
-public class CameraManager {
-    private static final String TAG = "CameraManager";
-
-    private enum State {
-        STATE_IDLE,
-        STATE_OPENED,
-        STATE_SHOOTING
+@SuppressLint("StaticFieldLeak")
+object CameraManager {
+    private enum class State {
+        STATE_IDLE, STATE_OPENED, STATE_SHOOTING
     }
 
-    public interface Callback<T> {
-        void onEvent(T t);
+    private const val TAG = "CameraManager"
+
+    private var mCameraIdBack = -1
+    private var mCameraIdFront = -1
+    private var mContext: Context? = null
+    private var mCamera: Camera? = null
+    private val mUiHandler: Handler
+    private val mThreadHandler: Handler
+    private var mSurfaceHolder: SurfaceHolder? = null
+    private val mSurfaceSize = Point()
+    private var mCameraId = 0
+    private var mState = State.STATE_IDLE
+    private var mSensorRotation = 0
+
+    init {
+        mUiHandler = Handler(Looper.getMainLooper())
+        val handlerThread = HandlerThread("$TAG-Thread")
+        handlerThread.start()
+        mThreadHandler = Handler(handlerThread.looper)
+        findCameras()
     }
 
-    private int CAMERA_ID_BACK = -1;
-    private int CAMERA_ID_FRONT = -1;
-
-    private Context mContext;
-    private Camera mCamera;
-    private Handler mUiHandler;
-    private Handler mThreadHandler;
-    private SurfaceHolder mSurfaceHolder;
-    private Point mSurfaceSize = new Point();
-    private int mCameraId;
-    private State mState = State.STATE_IDLE;
-    private int mSensorRotation;
-
-    public static CameraManager getInstance() {
-        return SingletonHolder.instance;
+    fun init(context: Context) {
+        mContext = context.applicationContext
+        mCameraId = -1
     }
 
-    private static class SingletonHolder {
-        private static CameraManager instance = new CameraManager();
+    fun setSurfaceHolder(holder: SurfaceHolder?, width: Int, height: Int) {
+        mSurfaceHolder = holder
+        mSurfaceSize[height] = width
     }
 
-    private CameraManager() {
-        mUiHandler = new Handler(Looper.getMainLooper());
-        HandlerThread handlerThread = new HandlerThread(TAG + "-Thread");
-        handlerThread.start();
-        mThreadHandler = new Handler(handlerThread.getLooper());
-        findCameras();
-    }
-
-    public void init(Context context) {
-        mContext = context.getApplicationContext();
-        mCameraId = -1;
-    }
-
-    public void setSurfaceHolder(SurfaceHolder holder, int width, int height) {
-        mSurfaceHolder = holder;
-        mSurfaceSize.set(height, width);
-    }
-
-    public void open(final Callback<Boolean> callback) {
-        checkInitialize();
-        mThreadHandler.post(new SafeRunnable() {
-            @Override
-            public void runSafely() {
-                openImmediate();
-
-                final boolean success = (mState == State.STATE_OPENED);
-                mUiHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        callback.onEvent(success);
-                    }
-                });
+    fun open(callback: (Boolean) -> Unit) {
+        checkInitialize()
+        mThreadHandler.post(object : SafeRunnable() {
+            override fun runSafely() {
+                openImmediate()
+                val success = mState == State.STATE_OPENED
+                mUiHandler.post { callback.invoke(success) }
             }
-        });
+        })
     }
 
-    private void openImmediate() {
-        closeImmediate();
-
+    private fun openImmediate() {
+        closeImmediate()
         if (mSurfaceHolder == null) {
-            return;
+            return
         }
-
-        if (mCameraId < 0 && CAMERA_ID_BACK >= 0) {
-            mCameraId = CAMERA_ID_BACK;
+        if (mCameraId < 0 && mCameraIdBack >= 0) {
+            mCameraId = mCameraIdBack
         }
-
         if (mCameraId < 0) {
-            return;
+            return
         }
-
         try {
-            mCamera = Camera.open(mCameraId);
-
-            Camera.Parameters parameters = mCamera.getParameters();
-            CameraUtils.setPreviewParams(mSurfaceSize, parameters);
-
-            mCamera.setParameters(parameters);
-            mCamera.setDisplayOrientation(getDisplayOrientation());
-            mCamera.setPreviewDisplay(mSurfaceHolder);
-            mCamera.startPreview();
-            setState(State.STATE_OPENED);
-        } catch (Throwable th) {
-            Log.e(TAG, "open camera failed", th);
+            mCamera = Camera.open(mCameraId) ?: return
+            val parameters = mCamera!!.parameters
+            CameraUtils.setPreviewParams(mSurfaceSize, parameters)
+            mCamera!!.parameters = parameters
+            mCamera!!.setDisplayOrientation(getDisplayOrientation())
+            mCamera!!.setPreviewDisplay(mSurfaceHolder)
+            mCamera!!.startPreview()
+            setState(State.STATE_OPENED)
+        } catch (th: Throwable) {
+            Log.e(TAG, "open camera failed", th)
         }
     }
 
-    public boolean isOpened() {
-        return mCamera != null && mState != State.STATE_IDLE;
-    }
+    fun isOpened(): Boolean = mCamera != null && mState != State.STATE_IDLE
 
-    public boolean hasMultiCamera() {
-        return CAMERA_ID_BACK >= 0 && CAMERA_ID_FRONT >= 0;
-    }
+    fun hasMultiCamera(): Boolean = mCameraIdBack >= 0 && mCameraIdFront >= 0
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    public void setFocus(final float x, final float y, final Callback<Boolean> callback) {
-        checkInitialize();
-        mThreadHandler.post(new SafeRunnable() {
-            @Override
-            public void runSafely() {
+    fun setFocus(x: Float, y: Float, callback: (Boolean) -> Unit) {
+        checkInitialize()
+        mThreadHandler.post(object : SafeRunnable() {
+            override fun runSafely() {
                 if (mState != State.STATE_OPENED) {
-                    return;
+                    return
                 }
-
-                mCamera.cancelAutoFocus();
-                Camera.Parameters parameters = mCamera.getParameters();
-                CameraUtils.setFocusArea(mSurfaceSize, parameters, x, y);
-                mCamera.setParameters(parameters);
-                mCamera.autoFocus(new Camera.AutoFocusCallback() {
-                    @Override
-                    public void onAutoFocus(final boolean success, Camera camera) {
-                        Log.d(TAG, "auto focus result: " + success);
-
-                        mUiHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (callback != null) {
-                                    callback.onEvent(success);
-                                }
-                            }
-                        });
-                    }
-                });
+                mCamera!!.cancelAutoFocus()
+                val parameters = mCamera!!.parameters
+                CameraUtils.setFocusArea(mSurfaceSize, parameters, x, y)
+                mCamera!!.parameters = parameters
+                mCamera!!.autoFocus { success, camera ->
+                    Log.d(TAG, "auto focus result: $success")
+                    mUiHandler.post { callback.invoke(success) }
+                }
             }
-        });
+        })
     }
 
-    public void setZoom(final float span) {
-        checkInitialize();
-        mThreadHandler.post(new SafeRunnable() {
-            @Override
-            public void runSafely() {
+    fun setZoom(span: Float) {
+        checkInitialize()
+        mThreadHandler.post(object : SafeRunnable() {
+            override fun runSafely() {
                 if (mState != State.STATE_OPENED) {
-                    return;
+                    return
                 }
-
-                Camera.Parameters parameters = mCamera.getParameters();
-                if (parameters.isZoomSupported()) {
-                    boolean valid = CameraUtils.setZoom(mSurfaceSize, parameters, span);
+                val parameters = mCamera!!.parameters
+                if (parameters.isZoomSupported) {
+                    val valid = CameraUtils.setZoom(mSurfaceSize, parameters, span)
                     if (valid) {
-                        mCamera.setParameters(parameters);
+                        mCamera!!.parameters = parameters
                     }
                 }
             }
-        });
+        })
     }
 
-    public void switchCamera(final Callback<Boolean> callback) {
-        checkInitialize();
-        mThreadHandler.post(new SafeRunnable() {
-            @Override
-            public void runSafely() {
+    fun switchCamera(callback: (Boolean) -> Unit) {
+        checkInitialize()
+        mThreadHandler.post(object : SafeRunnable() {
+            override fun runSafely() {
                 if (!hasMultiCamera()) {
-                    return;
+                    return
                 }
-
-                if (mCameraId == CAMERA_ID_BACK) {
-                    mCameraId = CAMERA_ID_FRONT;
-                } else if (mCameraId == CAMERA_ID_FRONT) {
-                    mCameraId = CAMERA_ID_BACK;
-                } else {
-                    mCameraId = CAMERA_ID_BACK;
+                mCameraId = when (mCameraId) {
+                    mCameraIdBack -> mCameraIdFront
+                    mCameraIdFront -> mCameraIdBack
+                    else -> mCameraIdBack
                 }
-
-                openImmediate();
-
-                final boolean success = (mState == State.STATE_OPENED);
-                mUiHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (callback != null) {
-                            callback.onEvent(success);
-                        }
-                    }
-                });
+                openImmediate()
+                val success = mState == State.STATE_OPENED
+                mUiHandler.post { callback.invoke(success) }
             }
-        });
+        })
     }
 
-    public void setSensorRotation(int rotation) {
-        mSensorRotation = rotation;
+    fun setSensorRotation(rotation: Int) {
+        mSensorRotation = rotation
     }
 
-    public void takePicture(final Callback<Bitmap> callback) {
-        checkInitialize();
-        mThreadHandler.post(new SafeRunnable() {
-            @Override
-            public void runSafely() {
+    fun takePicture(callback: (Result<Bitmap>) -> Unit) {
+        checkInitialize()
+        mThreadHandler.post(object : SafeRunnable() {
+            override fun runSafely() {
                 if (mState != State.STATE_OPENED) {
-                    return;
+                    mUiHandler.post { callback.invoke(Result.failure(IllegalStateException("camera not open"))) }
+                    return
                 }
-
-                setState(State.STATE_SHOOTING);
-
-                mCamera.takePicture(null, null, new Camera.PictureCallback() {
-                    @Override
-                    public void onPictureTaken(byte[] data, Camera camera) {
-                        closeImmediate();
-
-                        final Bitmap result;
-                        if (data != null && data.length > 0) {
-                            Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-                            Matrix matrix = new Matrix();
-                            int rotation = getDisplayOrientation() + mSensorRotation;
-                            if (mCameraId == CAMERA_ID_BACK) {
-                                matrix.setRotate(rotation);
-                            } else {
-                                rotation = (360 - rotation) % 360;
-                                matrix.setRotate(rotation);
-                                matrix.postScale(-1, 1);
-                            }
-                            result = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                setState(State.STATE_SHOOTING)
+                mCamera!!.takePicture(null, null) { data, camera ->
+                    closeImmediate()
+                    if (data != null && data.isNotEmpty()) {
+                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+                        val matrix = Matrix()
+                        var rotation = getDisplayOrientation() + mSensorRotation
+                        if (mCameraId == mCameraIdBack) {
+                            matrix.setRotate(rotation.toFloat())
                         } else {
-                            result = null;
+                            rotation = (360 - rotation) % 360
+                            matrix.setRotate(rotation.toFloat())
+                            matrix.postScale(-1f, 1f)
                         }
-
-                        mUiHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (callback != null) {
-                                    callback.onEvent(result);
-                                }
-                            }
-                        });
+                        val result = Bitmap.createBitmap(
+                            bitmap,
+                            0,
+                            0,
+                            bitmap.width,
+                            bitmap.height,
+                            matrix,
+                            true
+                        )
+                        mUiHandler.post { callback.invoke(Result.success(result)) }
+                    } else {
+                        mUiHandler.post { callback.invoke(Result.failure(IllegalStateException("capture data is null or empty"))) }
                     }
-                });
+                }
             }
-        });
+        })
     }
 
-    public void close() {
-        mThreadHandler.post(new SafeRunnable() {
-            @Override
-            public void runSafely() {
-                closeImmediate();
+    fun close() {
+        mThreadHandler.post(object : SafeRunnable() {
+            override fun runSafely() {
+                closeImmediate()
             }
-        });
+        })
     }
 
-    private void checkInitialize() {
-        if (mContext == null) {
-            throw new IllegalStateException("camera manager is not initialized");
-        }
+    private fun checkInitialize() {
+        checkNotNull(mContext) { "camera manager is not initialized" }
     }
 
-    private void closeImmediate() {
-        if (mCamera != null) {
-            mCamera.stopPreview();
-            mCamera.release();
-            mCamera = null;
-        }
-
+    private fun closeImmediate() {
+        mCamera?.stopPreview()
+        mCamera?.release()
+        mCamera = null
         if (mState != State.STATE_IDLE) {
-            setState(State.STATE_IDLE);
+            setState(State.STATE_IDLE)
         }
     }
 
-    private void setState(State state) {
-        Log.d(TAG, "change state from " + mState + " to " + state);
-        mState = state;
+    private fun setState(state: State) {
+        Log.d(TAG, "change state from $mState to $state")
+        mState = state
     }
 
-    private void findCameras() {
-        Camera.CameraInfo info = new Camera.CameraInfo();
-        for (int i = 0; i < Camera.getNumberOfCameras(); i++) {
-            Camera.getCameraInfo(i, info);
-            if (info.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
-                CAMERA_ID_BACK = info.facing;
-            } else if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-                CAMERA_ID_FRONT = info.facing;
+    private fun findCameras() {
+        val info = CameraInfo()
+        for (i in 0 until Camera.getNumberOfCameras()) {
+            Camera.getCameraInfo(i, info)
+            if (info.facing == CameraInfo.CAMERA_FACING_BACK) {
+                mCameraIdBack = info.facing
+            } else if (info.facing == CameraInfo.CAMERA_FACING_FRONT) {
+                mCameraIdFront = info.facing
             }
         }
-    }
+    }// back-facing
 
-    private int getDisplayOrientation() {
-        Camera.CameraInfo info = new Camera.CameraInfo();
-        Camera.getCameraInfo(mCameraId, info);
-        WindowManager windowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
-        int rotation = windowManager.getDefaultDisplay().getRotation();
-        int degrees = 0;
-        switch (rotation) {
-            case Surface.ROTATION_0:
-                degrees = 0;
-                break;
-            case Surface.ROTATION_90:
-                degrees = 90;
-                break;
-            case Surface.ROTATION_180:
-                degrees = 180;
-                break;
-            case Surface.ROTATION_270:
-                degrees = 270;
-                break;
+    // compensate the mirror
+    private fun getDisplayOrientation(): Int {
+        val info = CameraInfo()
+        Camera.getCameraInfo(mCameraId, info)
+        val windowManager = mContext!!.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val rotation = windowManager.defaultDisplay.rotation
+        var degrees = 0
+        when (rotation) {
+            Surface.ROTATION_0 -> degrees = 0
+            Surface.ROTATION_90 -> degrees = 90
+            Surface.ROTATION_180 -> degrees = 180
+            Surface.ROTATION_270 -> degrees = 270
         }
-
-        int result;
-        if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-            result = (info.orientation + degrees) % 360;
-            result = (360 - result) % 360;  // compensate the mirror
+        var result: Int
+        if (info.facing == CameraInfo.CAMERA_FACING_FRONT) {
+            result = (info.orientation + degrees) % 360
+            result = (360 - result) % 360 // compensate the mirror
         } else {  // back-facing
-            result = (info.orientation - degrees + 360) % 360;
+            result = (info.orientation - degrees + 360) % 360
         }
-        return result;
+        return result
     }
 
-    private static abstract class SafeRunnable implements Runnable {
-        @Override
-        public final void run() {
+    private abstract class SafeRunnable : Runnable {
+        override fun run() {
             try {
-                runSafely();
-            } catch (Throwable th) {
-                Log.e(TAG, "camera error", th);
+                runSafely()
+            } catch (th: Throwable) {
+                Log.e(TAG, "camera error", th)
             }
         }
 
-        public abstract void runSafely();
+        abstract fun runSafely()
     }
 }

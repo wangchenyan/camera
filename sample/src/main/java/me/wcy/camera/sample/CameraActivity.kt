@@ -1,100 +1,98 @@
-package me.wcy.camera.sample;
+package me.wcy.camera.sample
 
-import android.content.Intent;
-import android.graphics.Bitmap;
-import android.net.Uri;
-import android.os.Bundle;
-import android.provider.MediaStore;
-import androidx.appcompat.app.AppCompatActivity;
-import android.text.TextUtils;
-import android.util.Log;
-import android.view.Window;
-import android.view.WindowManager;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-
-import me.wcy.camera.CameraView;
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Log
+import android.view.Window
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import me.wcy.camera.CameraView
+import me.wcy.camera.CameraView.CameraListener
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 /**
  * Created by hzwangchenyan on 2017/6/15.
  */
-public class CameraActivity extends AppCompatActivity implements CameraView.CameraListener {
-    private static final String TAG = "CameraActivity";
-    private CameraView mCameraView;
-    private String mPath;
+class CameraActivity : AppCompatActivity() {
+    private lateinit var mCameraView: CameraView
+    private lateinit var mPath: String
 
-    public static void startForResult(AppCompatActivity activity, String path, int requestCode) {
-        Intent intent = new Intent(activity, CameraActivity.class);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, path);
-        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        activity.startActivityForResult(intent, requestCode);
-    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestWindowFeature(Window.FEATURE_NO_TITLE)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-        mCameraView = new CameraView(this);
-        setContentView(mCameraView);
-
-        mPath = getIntent().getStringExtra(MediaStore.EXTRA_OUTPUT);
-        if (TextUtils.isEmpty(mPath)) {
-            finish();
-            return;
+        val path = intent.getStringExtra(MediaStore.EXTRA_OUTPUT)
+        if (path.isNullOrEmpty()) {
+            Toast.makeText(this, "保存路径不能为空", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
+        mPath = path
 
-        mCameraView.setCameraListener(this);
+        mCameraView = CameraView(this)
+        setContentView(mCameraView)
+
+        mCameraView.setCameraListener(object : CameraListener {
+            override fun onCapture(bitmap: Bitmap) {
+                val file = File(path)
+                if (!file.parentFile.exists()) {
+                    file.parentFile.mkdirs()
+                }
+                try {
+                    val out = FileOutputStream(file)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+                    out.flush()
+                    out.close()
+                } catch (e: IOException) {
+                    Log.e(TAG, "save picture error", e)
+                }
+                if (file.exists()) {
+                    val data = Intent()
+                    data.data = Uri.parse(path)
+                    setResult(RESULT_OK, data)
+                }
+                finish()
+            }
+
+            override fun onCameraClose() {
+                finish()
+            }
+
+            override fun onCameraError(th: Throwable?) {
+                Log.e(TAG, "camera error", th)
+                onCameraClose()
+            }
+        })
     }
 
-    @Override
-    public void onCapture(Bitmap bitmap) {
-        File file = new File(mPath);
-        if (!file.getParentFile().exists()) {
-            file.getParentFile().mkdirs();
+    override fun onResume() {
+        super.onResume()
+        mCameraView.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mCameraView.onPause()
+    }
+
+    companion object {
+        private const val TAG = "CameraActivity"
+
+        fun startForResult(activity: AppCompatActivity, path: String, requestCode: Int) {
+            val intent = Intent(activity, CameraActivity::class.java)
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, path)
+            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            activity.startActivityForResult(intent, requestCode)
         }
-
-        try {
-            FileOutputStream out = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-            out.flush();
-            out.close();
-        } catch (IOException e) {
-            Log.e(TAG, "save picture error", e);
-        }
-
-        if (file.exists()) {
-            Intent data = new Intent();
-            data.setData(Uri.parse(mPath));
-            setResult(RESULT_OK, data);
-        }
-
-        finish();
-    }
-
-    @Override
-    public void onCameraClose() {
-        finish();
-    }
-
-    @Override
-    public void onCameraError(Throwable th) {
-        Log.e(TAG, "camera error", th);
-        onCameraClose();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        mCameraView.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        mCameraView.onPause();
     }
 }
